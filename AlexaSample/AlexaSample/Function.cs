@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Alexa.NET;
 using Alexa.NET.Request;
@@ -27,33 +28,52 @@ namespace AlexaSample
         public async Task<SkillResponse> FunctionHandler(SkillRequest input, ILambdaContext context)
         {
             var log = context.Logger;
+            SkillResponse response = null;
             try
             {
                 switch (input.Request)
                 {
                     case LaunchRequest r:
-                        return ResponseBuilder.Ask(
+                        response = ResponseBuilder.Ask(
                             speechResponse: responses.Launch,
                             reprompt: new Reprompt()
                             {
                                 OutputSpeech = new PlainTextOutputSpeech() { Text = responses.Reprompt }
                             });
+                        break;
                     case IntentRequest r when r.Intent.Name == "IndroductionIntent":
-                        return HandleIntroductionIntent();
+                        response = HandleIntroductionIntent();
+                        break;
                     case IntentRequest r when r.Intent.Name == "AgendaIntent":
-                        return HandleAgendaIntent();
+                        response = HandleAgendaIntent();
+                        break;
                     case IntentRequest r when r.Intent.Name == "VoiceIntent":
-                        return HandleVoiceIntent();
+                        response = HandleVoiceIntent();
+                        break;
                     case IntentRequest r when r.Intent.Name == "TemperatureIntent":
-                        return HandleTemperatureIntent(r);
+                        response = HandleTemperatureIntent(r);
+                        break;
+                    case IntentRequest r when r.Intent.Name == "AudienceIntent":
+                        response = HandleAudienceIntent(input);
+                        break;
+                    case IntentRequest r when r.Intent.Name == "SetAudienceCountIntent":
+                        response = HandleSetAudienceCountIntent(input, r);
+                        break;
+                    case IntentRequest r when r.Intent.Name == "InvalidIntent":
+                        response = HandleInvalidIntent(r);
+                        break;
                     case IntentRequest r when r.Intent.Name == BuiltInIntent.Cancel:
-                        return ResponseBuilder.Tell("You've requested 'Cancel'");
+                        response = ResponseBuilder.Tell("You've requested 'Cancel'");
+                        break;
                     case IntentRequest r when r.Intent.Name == BuiltInIntent.Stop:
-                        return ResponseBuilder.Tell("You've requested 'Cancel'");
+                        response = ResponseBuilder.Tell("You've requested 'Cancel'");
+                        break;
                     case IntentRequest r when r.Intent.Name == BuiltInIntent.Help:
-                        return ResponseBuilder.Tell("You've requested 'Help'");
+                        response = ResponseBuilder.Tell("You've requested 'Help'");
+                        break;
                     default:
-                        return ResponseBuilder.Tell("I don't know what you mean, I can help you if you ask me.");
+                        response = ResponseBuilder.Tell("I don't know what you mean, I can help you if you ask me.");
+                        break;
                 }
             }
             catch (Exception e)
@@ -61,6 +81,50 @@ namespace AlexaSample
                 log.LogLine(e.ToString());
                 throw;
             }
+
+            response.Response.ShouldEndSession = false;
+            return response;
+        }
+
+        private SkillResponse HandleInvalidIntent(IntentRequest r) => ResponseBuilder.Tell(new SsmlOutputSpeech()
+        {
+            Ssml = "<speak>Maybe you should read the documentation?<speak>"
+        });
+
+        private SkillResponse HandleAudienceIntent(SkillRequest input)
+        {
+            if (input.Session.Attributes != null && 
+                input.Session.Attributes.TryGetValue("AudienceCount", out var count))
+            {
+                input.Session.Attributes.Clear();
+                return ResponseBuilder.Tell($"There are around {count} people here.", input.Session);
+            }
+            else
+            {
+                return ResponseBuilder.Ask("How the hell I'm supposed to know? I don't have camera dummy!", new Reprompt()
+                {
+                    OutputSpeech = new PlainTextOutputSpeech()
+                    {
+                        Text = responses.Reprompt
+                    }
+                },
+                input.Session);
+            }
+        }
+
+        private SkillResponse HandleSetAudienceCountIntent(SkillRequest input, IntentRequest r)
+        {
+            var count = r.Intent.Slots["count"].Value;
+            var countInt = int.Parse(count);
+
+            if (input.Session.Attributes == null)
+                input.Session.Attributes = new Dictionary<string, object>();
+            else
+                input.Session.Attributes.Clear();
+
+            input.Session.Attributes.Add("AudienceCount", countInt);
+
+            return ResponseBuilder.Tell($"Ok I'll try to remember there are around {countInt} people here.", input.Session);
         }
 
         private SkillResponse HandleIntroductionIntent() => ResponseBuilder.Tell(new SsmlOutputSpeech() { Ssml = "<speak><s>Hey there!</s><s> My name is Alexa and I'm an virtual assistant.</s> <s>Most of the time I'm sitting on desk in this dude's basement.</s> <s>I could tell you thing or two about him, if any of you would like to grab a beer after his talk.</s> <break time='3s'/> <s>I know some embarassing stuff.</s><s><amazon:effect name='whispered'>A lot of embarassing stuff.</amazon:effect></s></speak>" });
@@ -137,7 +201,7 @@ namespace AlexaSample
 
         public string Introduction =>
             "Hey there! My name is Alexa and I'm an virtual assistant. Most of the time I'm sitting on desk in this dude's basement. I could tell you thing or two about him, if any of you would like to grab a beer after his talk.";
-        
+
         private readonly string[] voiceSSML = new string[]
         {
             "TODO"
@@ -145,7 +209,7 @@ namespace AlexaSample
 
         public string VoiceSSML => GetRandomResponse(voiceSSML);
 
-    private string GetRandomResponse(string[] responseCollection)
+        private string GetRandomResponse(string[] responseCollection)
         {
             if (responseCollection == null)
                 throw new ArgumentNullException(nameof(responseCollection));
