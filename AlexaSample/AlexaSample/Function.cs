@@ -204,10 +204,13 @@ namespace AlexaSample
 
         private readonly string[] voiceSSML = new string[]
         {
-            "TODO"
+            "Everyone could use a short <break time='1s'/>break from time to time",
+            "<prosody rate='x-slow'>I can talk very slow.</prosody><prosody rate='x-fast'>Or very fast</prosody>",
+            "I can speak about some number as telephone number like <say-as interpret-as='telephone'>0 555 555 555</say-as>. I can also speak single digits<say-as interpret-as='digits'>555555555</say-as>. And tell it like ordinal number as well <say-as interpret-as='ordinal'>555555555</say-as>.",
+            "I can also stress something <emphasis level='strong'>important</emphasis>"
         };
 
-        public string VoiceSSML => GetRandomResponse(voiceSSML);
+        public string VoiceSSML => $"<speak>{GetRandomResponse(voiceSSML)}</speak>";
 
         private string GetRandomResponse(string[] responseCollection)
         {
